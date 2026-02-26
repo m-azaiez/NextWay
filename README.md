@@ -1,10 +1,14 @@
+![Python](https://img.shields.io/badge/Python-3.x-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Status](https://img.shields.io/badge/Status-Active%20Development-orange)
+
 # 🚀 Nextway
 
 Nextway is a scalable Python-based pathfinding engine designed to compute and optimize routes on real-world map data.
 
 The project focuses on graph theory, algorithm optimization, and clean architecture to evolve from a core routing engine into a production-ready routing system capable of integrating real geographic data (OpenStreetMap) and future application layers.
 
-⸻
+
 
 # 🎯 Vision
 
@@ -19,7 +23,7 @@ The objective is not only to implement classical algorithms such as Dijkstra and
 
 This project evolves progressively from algorithm fundamentals to real-world routing applications.
 
-⸻
+
 
 # 🧠 Core Concepts
 
@@ -30,21 +34,21 @@ Nextway is built around:
 	•	Real-world map parsing (OpenStreetMap-ready architecture)
 	•	Clean separation of concerns (core / IO / CLI / tests)
 
-⸻
+
 
 # 🏗️ Architecture
 
-nextway/
-│
-├── src/
-│   ├── core/        # Graph structures and algorithms
-│   ├── io/          # Data loading and parsing
-│   ├── cli/         # Command-line interface
-│   └── tests/       # Unit tests
-│
-├── README.md
-├── requirements.txt
-└── .gitignore
+	nextway/
+	│
+	├── src/
+	│   ├── core/        # Graph structures and algorithms
+	│   ├── io/          # Data loading and parsing
+	│   ├── cli/         # Command-line interface
+	│   └── tests/       # Unit tests
+	│
+	├── README.md
+	├── requirements.txt
+	└── .gitignore
 
 The architecture is designed to remain maintainable as the project grows toward:
 	•	Real map routing
@@ -52,7 +56,7 @@ The architecture is designed to remain maintainable as the project grows toward:
 	•	API layer
 	•	Advanced routing optimizations
 
-⸻
+
 
 # 📍 Roadmap
 
@@ -77,7 +81,6 @@ Phase 4 — Application Layer
 	•	Web visualization
 	•	Scalable routing service architecture
 
-⸻
 
 # 🛠️ Tech Stack #
 
@@ -86,14 +89,14 @@ Phase 4 — Application Layer
 	•	Algorithm optimization
 	•	OpenStreetMap data integration (planned)
 
-⸻
+
 
 # 📌 Project Status
 
 Currently under active development.
 Architecture-first approach.
 
-⸻
+
 
 # 👤 Author
 
