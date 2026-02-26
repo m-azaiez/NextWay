@@ -1,0 +1,25 @@
+This is the report of all my progress on the NextWay project.
+It is intended for personal purposes only.
+It is in no way intended to be used or deployed in production.
+Thank you.
+
+⸻
+
+26/02/2026
+
+Objective of the day
+	•	Lay the foundations of the project
+	•	Think about the overall architecture
+
+Reasoning
+	•	I will study how to design a modular architecture so that I can later replace my pathfinding algorithm with an existing SDK.
+
+Actions of the day
+	•	Created the project
+	•	Created the src folder
+	•	Created the graph folder
+	•	Created the algorithms folder
+	•	Created the tests folder
+	•	Created the data folder
+	•	Created the files: README.md, Logs.txt, requirements.txt, main.py, graph.py
+	•	The Base.py file serves as a contract for the graphs (it defines their limits and capabilities).
