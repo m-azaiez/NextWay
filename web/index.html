@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NextWay — itinéraire</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --accent:#38bdf8; --text:#e2e8f0; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; font-family: system-ui, sans-serif; }
+    #map { position:absolute; inset:0; }
+    .panel {
+      position:absolute; top:12px; left:12px; z-index:1000;
+      background:var(--panel); color:var(--text); padding:14px 16px;
+      border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.35);
+      width:280px; line-height:1.45;
+    }
+    .panel h1 { font-size:16px; margin:0 0 6px; }
+    .panel .hint { font-size:12px; opacity:.8; margin:6px 0 10px; }
+    .row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    select, button {
+      font:inherit; padding:6px 10px; border-radius:8px; border:1px solid #334155;
+      background:#0b1220; color:var(--text); cursor:pointer;
+    }
+    button.primary { background:var(--accent); color:#062235; border:none; font-weight:600; }
+    .stat { font-size:13px; margin-top:10px; }
+    .stat b { color:var(--accent); }
+    .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+    .badge { font-size:11px; opacity:.7; }
+    .addr { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+    .addr input { font:inherit; padding:7px 10px; border-radius:8px; border:1px solid #334155; background:#0b1220; color:var(--text); }
+    .orsep { text-align:center; font-size:11px; opacity:.55; margin:10px 0 2px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="panel">
+    <h1>🚀 NextWay</h1>
+    <div class="hint">Clique un point de <b>départ</b>, puis un point d'<b>arrivée</b>. Un 3ᵉ clic recommence.</div>
+    <div class="addr">
+      <input id="from" placeholder="Départ : adresse ou lieu" />
+      <input id="to" placeholder="Arrivée : adresse ou lieu" />
+      <button id="go" class="primary">Tracer l'itinéraire</button>
+    </div>
+    <div class="orsep">— ou clique deux points sur la carte —</div>
+    <div class="row">
+      <label for="algo">Algo</label>
+      <select id="algo">
+        <option value="astar">A*</option>
+        <option value="dijkstra">Dijkstra</option>
+        <option value="ch">CH (rapide)</option>
+      </select>
+      <button id="reset">Réinitialiser</button>
+    </div>
+    <div class="stat" id="status">Connexion à l'API…</div>
+    <div class="stat" id="result"></div>
+    <div class="badge" id="source"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Servi par l'API elle-même -> same-origin. Si tu sers le frontend
+    // ailleurs (ex: python -m http.server), mets "http://127.0.0.1:8000".
+    const API = "";
+
+    const map = L.map("map").setView([48.8666, 2.3622], 14);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap"
+    }).addTo(map);
+
+    let startPt = null, goalPt = null, dataBounds = null;
+    let startMarker = null, goalMarker = null, routeLine = null, snapLayer = null;
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const sourceEl = document.getElementById("source");
+
+    // Auto-centre sur les données chargées (démo ou vraie ville).
+    fetch(API + "/health").then(r => r.json()).then(h => {
+      statusEl.innerHTML = "✅ API connectée — clique pour commencer.";
+      sourceEl.textContent = `source : ${h.source} · ${h.routable_nodes ?? h.nodes} nœuds routables`;
+      if (h.bbox) {
+        dataBounds = L.latLngBounds([[h.bbox.min_lat, h.bbox.min_lon], [h.bbox.max_lat, h.bbox.max_lon]]);
+        L.rectangle(dataBounds, { color:"#f59e0b", weight:1.5, fill:false, dashArray:"6 6" })
+          .addTo(map).bindTooltip("Zone chargée — clique à l'intérieur");
+        map.fitBounds(dataBounds, { padding:[30,30] });
+      }
+    }).catch(() => {
+      statusEl.innerHTML = "❌ API injoignable. Lance <code>uvicorn nextway.api.app:app</code>.";
+    });
+
+    function clearAll() {
+      [startMarker, goalMarker, routeLine, snapLayer].forEach(l => l && map.removeLayer(l));
+      startMarker = goalMarker = routeLine = snapLayer = null;
+      startPt = goalPt = null;
+      resultEl.textContent = "";
+      statusEl.innerHTML = "Clique un point de départ.";
+    }
+    document.getElementById("reset").onclick = clearAll;
+    document.getElementById("algo").onchange = () => { if (startPt && goalPt) computeRoute(); };
+
+    async function geocodeOne(q) {
+      const r = await fetch(API + "/geocode?q=" + encodeURIComponent(q));
+      if (!r.ok) throw new Error("introuvable");
+      const list = await r.json();
+      if (!list.length) throw new Error("introuvable");
+      return list[0];
+    }
+    document.getElementById("go").onclick = async () => {
+      const f = document.getElementById("from").value.trim();
+      const t = document.getElementById("to").value.trim();
+      if (!f || !t) { statusEl.innerHTML = "Entre une adresse de départ ET d'arrivée."; return; }
+      statusEl.innerHTML = "🔎 Recherche des adresses…";
+      try {
+        const a = await geocodeOne(f);
+        const b = await geocodeOne(t);
+        clearAll();
+        startPt = { lat: a.lat, lon: a.lon };
+        goalPt  = { lat: b.lat, lon: b.lon };
+        startMarker = L.marker([a.lat, a.lon]).addTo(map).bindTooltip("Départ").openTooltip();
+        goalMarker  = L.marker([b.lat, b.lon]).addTo(map).bindTooltip("Arrivée").openTooltip();
+        await computeRoute();
+      } catch (e) {
+        statusEl.innerHTML = "❌ Adresse introuvable dans la zone chargée (essaie d'être plus précis).";
+      }
+    };
+    ["from", "to"].forEach(id =>
+      document.getElementById(id).addEventListener("keydown", e => {
+        if (e.key === "Enter") document.getElementById("go").click();
+      })
+    );
+
+    map.on("click", (e) => {
+      const { lat, lng } = e.latlng;
+      if (dataBounds && !dataBounds.contains(e.latlng)) {
+        statusEl.innerHTML = "📍 Hors de la zone chargée (rectangle orange). Clique dedans, ou télécharge une bbox plus grande.";
+        return;
+      }
+      if (!startPt || (startPt && goalPt)) {        // start a fresh pair
+        clearAll();
+        startPt = { lat, lon: lng };
+        startMarker = L.marker([lat, lng]).addTo(map).bindTooltip("Départ").openTooltip();
+        statusEl.innerHTML = "Maintenant clique l'arrivée.";
+      } else {
+        goalPt = { lat, lon: lng };
+        goalMarker = L.marker([lat, lng]).addTo(map).bindTooltip("Arrivée").openTooltip();
+        computeRoute();
+      }
+    });
+
+    function fmt(m) { return m >= 1000 ? (m/1000).toFixed(2) + " km" : Math.round(m) + " m"; }
+
+    async function computeRoute() {
+      statusEl.innerHTML = "⏳ Calcul de l'itinéraire…";
+      const algo = document.getElementById("algo").value;
+      try {
+        const res = await fetch(API + "/route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ start: startPt, goal: goalPt, algo })
+        });
+        if (res.status === 404) { statusEl.innerHTML = "🚫 Aucun itinéraire entre ces deux points."; return; }
+        if (!res.ok) { statusEl.innerHTML = "Erreur API (" + res.status + ")."; return; }
+        const data = await res.json();
+
+        if (routeLine) map.removeLayer(routeLine);
+        if (snapLayer) map.removeLayer(snapLayer);
+
+        routeLine = L.polyline(data.path, { color: "#38bdf8", weight: 6, opacity: .9 }).addTo(map);
+        // montre où les clics ont été "snappés" sur le réseau
+        snapLayer = L.layerGroup([
+          L.circleMarker(data.snapped_start, { radius:6, color:"#22c55e", fillOpacity:1 }),
+          L.circleMarker(data.snapped_goal,  { radius:6, color:"#ef4444", fillOpacity:1 }),
+        ]).addTo(map);
+        map.fitBounds(routeLine.getBounds(), { padding:[40,40] });
+
+        statusEl.innerHTML = "✅ Itinéraire trouvé.";
+        resultEl.innerHTML =
+          `<span class="dot" style="background:#38bdf8"></span><b>${fmt(data.distance_m)}</b>` +
+          ` · ${data.nodes.length} nœuds · ${data.algo}`;
+      } catch (err) {
+        statusEl.innerHTML = "❌ Impossible de joindre l'API (CORS ou serveur éteint ?).";
+      }
+    }
+  </script>
+</body>
+</html>

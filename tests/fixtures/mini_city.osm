@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="nextway-test-fixture">
+  <node id="1" lat="48.8540" lon="2.3490"/>
+  <node id="2" lat="48.8540" lon="2.3500"/>
+  <node id="3" lat="48.8540" lon="2.3510"/>
+  <node id="4" lat="48.8550" lon="2.3490"/>
+  <node id="5" lat="48.8550" lon="2.3500"/>
+  <node id="6" lat="48.8550" lon="2.3510"/>
+  <node id="7" lat="48.8560" lon="2.3490"/>
+  <node id="8" lat="48.8560" lon="2.3500"/>
+  <node id="9" lat="48.8560" lon="2.3510"/>
+  <node id="10" lat="48.8551" lon="2.3505"/>
+
+  <!-- horizontal streets (two-way) -->
+  <way id="101"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="highway" v="residential"/></way>
+  <way id="102"><nd ref="4"/><nd ref="5"/><nd ref="6"/><tag k="highway" v="residential"/></way>
+  <way id="103"><nd ref="7"/><nd ref="8"/><nd ref="9"/><tag k="highway" v="primary"/></way>
+
+  <!-- left and right vertical streets (two-way) -->
+  <way id="104"><nd ref="1"/><nd ref="4"/><nd ref="7"/><tag k="highway" v="residential"/></way>
+  <way id="105"><nd ref="3"/><nd ref="6"/><nd ref="9"/><tag k="highway" v="residential"/></way>
+
+  <!-- middle vertical street: ONE-WAY going 2 -> 5 -> 8 only -->
+  <way id="106"><nd ref="2"/><nd ref="5"/><nd ref="8"/><tag k="highway" v="primary"/><tag k="oneway" v="yes"/></way>
+
+  <!-- a footway: must be EXCLUDED in drive_only mode -->
+  <way id="107"><nd ref="5"/><nd ref="10"/><tag k="highway" v="footway"/></way>
+</osm>
